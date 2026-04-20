@@ -104,6 +104,34 @@ Guides database access with Drizzle ORM and schema migrations with Drizzle Kit. 
 
 **Triggers**: "define a schema", "write a query", "drizzle migration", "db.select", "drizzle-kit generate", or any work under `src/db/`.
 
+### aws-cdk-development
+
+Guides building AWS infrastructure with CDK in TypeScript. Use when you want to:
+
+- Create or refactor CDK stacks and constructs
+- Define Lambda functions, API Gateway, DynamoDB, S3, and other AWS resources as code
+- Configure `NodejsFunction` for TypeScript Lambda bundling
+- Validate stacks before deployment with `cdk-nag` and `cdk synth`
+- Organize stacks — nested stacks, construct boundaries, cross-stack exports
+- Write CDK unit tests and CloudFormation snapshot tests
+- Deploy and verify infrastructure with `cdk deploy`
+
+**Triggers**: "create a CDK stack", "define infrastructure", "cdk deploy", "cdk synth", "IaC", "CloudFormation", or any work on CDK constructs.
+
+### typescript-expert
+
+Advanced TypeScript expertise covering type-level programming, performance optimization, migration strategies, and modern tooling. Use when you want to:
+
+- Design complex types — branded types, conditional types, template literal types, mapped types
+- Diagnose and fix TypeScript errors — circular types, "inferred type cannot be named", excessive stack depth
+- Optimize type checking performance — `incremental`, `skipLibCheck`, project references
+- Migrate JavaScript to TypeScript or upgrade between TypeScript versions
+- Choose and configure tooling — Biome vs ESLint, Turborepo vs Nx, ESM vs CJS
+- Write type tests with Vitest `expectTypeOf`
+- Configure monorepo TypeScript setups with project references
+
+**Triggers**: "TypeScript error", "fix types", "type-level", "branded type", "tsconfig", "slow type checking", "migrate to TypeScript", or any deep TypeScript question.
+
 ### lint-rule-development
 
 Guides creating custom lint rules in Biome's Analyzer. Use when you want to:
@@ -136,6 +164,27 @@ Issues and pull requests are welcome at [hu-shukang/lambda-api-plugin](https://g
 
 MIT
 
+## Changelog
+
+### 0.2.0
+
+- Added `drizzle-developer` skill — Drizzle ORM queries, schema definition, Drizzle Kit migrations, Lambda integration
+- Added `typescript-expert` skill — type-level programming, performance optimization, migration strategies
+- Added `aws-cdk-development` skill — CDK stacks, constructs, NodejsFunction, cdk-nag validation
+- Added `setup-project` agent — initializes full project structure in one run
+- Added `run-tests` agent — runs Vitest suite with pass/fail summary
+- Added `write-tests` agent — generates unit and integration tests from handler source
+- Added `biome-check` agent — lints and formats code with Biome, applies safe fixes
+- Added `/generate-lambda` command — interactive Lambda handler scaffolding
+- Added `SubagentStart` / `SubagentStop` hooks for subagent lifecycle logging
+
+### 0.1.0
+
+- Initial release
+- `lambda-api-developer` skill
+- `api-tester` skill
+- `lint-rule-development` skill
+
 ## Version
 
-0.1.0
+0.2.0

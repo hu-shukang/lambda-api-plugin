@@ -1,7 +1,7 @@
 {
   "name": "lambda-api-plugin",
-  "version": "0.1.0",
-  "description": "AWS API Gateway + Lambda Server API development toolkit with skills for handler development, testing, and lint rule creation",
+  "version": "0.2.0",
+  "description": "AWS API Gateway + Lambda Server API development toolkit with skills, agents, and commands covering handler development, Drizzle ORM, testing, CDK infrastructure, TypeScript, and code quality",
   "author": {
     "name": "HU",
     "email": "hushukang@gmail.com"
