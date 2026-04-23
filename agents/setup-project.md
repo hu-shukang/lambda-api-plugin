@@ -78,7 +78,7 @@ Add the DB container package based on the chosen database:
 - None → skip
 
 Add Drizzle ORM packages based on the chosen database:
-- PostgreSQL → prod: `drizzle-orm postgres` / dev: `drizzle-kit`
+- PostgreSQL → prod: `drizzle-orm pg` / dev: `drizzle-kit @types/pg`
 - MySQL → prod: `drizzle-orm mysql2` / dev: `drizzle-kit`
 - None → skip
 
