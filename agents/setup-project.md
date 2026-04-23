@@ -77,6 +77,11 @@ Add the DB container package based on the chosen database:
 - MySQL → `@testcontainers/mysql`
 - None → skip
 
+Add Drizzle ORM packages based on the chosen database:
+- PostgreSQL → prod: `drizzle-orm postgres` / dev: `drizzle-kit`
+- MySQL → prod: `drizzle-orm mysql2` / dev: `drizzle-kit`
+- None → skip
+
 Add Biome:
 ```
 @biomejs/biome
@@ -112,6 +117,7 @@ Create the following directories and files:
 {
   "compilerOptions": {
     "lib": ["ESNext"],
+    "types": ["node"],
     "target": "ESNext",
     "module": "Preserve",
     "moduleDetection": "force",
@@ -144,7 +150,7 @@ import { Logger } from '@aws-lambda-powertools/logger';
 import { search } from '@aws-lambda-powertools/logger/correlationId';
 
 export const logger = new Logger({
-  serviceName: process.env['SERVICE_NAME'] ?? '<project-name>',
+  serviceName: process.env.SERVICE_NAME ?? '<project-name>',
   correlationIdSearchFn: search,
 });
 ```
@@ -192,6 +198,106 @@ export function serializer(): MiddlewareObj {
 ### src/functions/.gitkeep
 
 Create an empty `.gitkeep` so the directory is tracked by git.
+
+### src/db/ — initialize when database is not None
+
+Skip this entire section if the user chose **None** for the database.
+
+**drizzle.config.ts** (project root):
+
+PostgreSQL:
+```typescript
+import { defineConfig } from 'drizzle-kit';
+
+export default defineConfig({
+  dialect: 'postgresql',
+  schema: './src/db/schema.ts',
+  out: './drizzle',
+  dbCredentials: {
+    url: process.env.DATABASE_URL!,
+  },
+});
+```
+
+MySQL:
+```typescript
+import { defineConfig } from 'drizzle-kit';
+
+export default defineConfig({
+  dialect: 'mysql',
+  schema: './src/db/schema.ts',
+  out: './drizzle',
+  dbCredentials: {
+    url: process.env.DATABASE_URL!,
+  },
+});
+```
+
+**src/db/index.ts**:
+
+PostgreSQL:
+```typescript
+import { drizzle } from 'drizzle-orm/node-postgres';
+import { Pool } from 'pg';
+import * as schema from './schema';
+
+const pool = new Pool({
+  host: process.env.DB_HOST,
+  port: Number(process.env.DB_PORT ?? 5432),
+  database: process.env.DB_NAME,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  max: 1,
+  idleTimeoutMillis: 0,
+});
+
+export const db = drizzle(pool, { schema });
+```
+
+MySQL:
+```typescript
+import { drizzle } from 'drizzle-orm/mysql2';
+import mysql from 'mysql2/promise';
+import * as schema from './schema';
+
+const pool = mysql.createPool({
+  host: process.env.DB_HOST,
+  port: Number(process.env.DB_PORT ?? 3306),
+  database: process.env.DB_NAME,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  connectionLimit: 1,
+});
+
+export const db = drizzle(pool, { schema, mode: 'default' });
+```
+
+**src/db/schema.ts** (empty scaffold — tables will be added per resource):
+
+PostgreSQL:
+```typescript
+import { pgTable, uuid, varchar, timestamp } from 'drizzle-orm/pg-core';
+
+// Add table definitions here as you create handlers
+// Example: export const users = pgTable('users', { ... });
+```
+
+MySQL:
+```typescript
+import { mysqlTable, varchar, datetime } from 'drizzle-orm/mysql-core';
+
+// Add table definitions here as you create handlers
+// Example: export const users = mysqlTable('users', { ... });
+```
+
+**src/db/types.ts**:
+```typescript
+// Export inferred types here as you define tables in schema.ts
+// import type { InferSelectModel, InferInsertModel } from 'drizzle-orm';
+// import type { users } from './schema';
+// export type User = InferSelectModel<typeof users>;
+// export type NewUser = InferInsertModel<typeof users>;
+```
 
 ### scripts/generate-openapi.ts
 
@@ -254,12 +360,21 @@ Generate based on the chosen database type:
 **PostgreSQL**:
 ```typescript
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from '@testcontainers/postgresql';
+import { drizzle } from 'drizzle-orm/node-postgres';
+import { migrate } from 'drizzle-orm/node-postgres/migrator';
+import { Pool } from 'pg';
 
 let container: StartedPostgreSqlContainer;
 
-export async function setup({ provide }: { provide: (key: string, value: unknown) => void }) {
+export async function setup({ provide }: { provide: (key: string, value: string) => void }) {
   container = await new PostgreSqlContainer('postgres:16').start();
-  provide('dbUri', container.getConnectionUri());
+  const uri = container.getConnectionUri();
+
+  const pool = new Pool({ connectionString: uri });
+  await migrate(drizzle(pool), { migrationsFolder: './drizzle' });
+  await pool.end();
+
+  provide('dbUri', uri);
 }
 
 export async function teardown() {
@@ -270,12 +385,21 @@ export async function teardown() {
 **MySQL**:
 ```typescript
 import { MySqlContainer, type StartedMySqlContainer } from '@testcontainers/mysql';
+import { drizzle } from 'drizzle-orm/mysql2';
+import { migrate } from 'drizzle-orm/mysql2/migrator';
+import mysql from 'mysql2/promise';
 
 let container: StartedMySqlContainer;
 
-export async function setup({ provide }: { provide: (key: string, value: unknown) => void }) {
+export async function setup({ provide }: { provide: (key: string, value: string) => void }) {
   container = await new MySqlContainer('mysql:8').start();
-  provide('dbUri', container.getConnectionUri());
+  const uri = container.getConnectionUri();
+
+  const pool = await mysql.createConnection(uri);
+  await migrate(drizzle(pool), { migrationsFolder: './drizzle' });
+  await pool.end();
+
+  provide('dbUri', uri);
 }
 
 export async function teardown() {
@@ -294,9 +418,15 @@ export async function teardown() {}
 ```typescript
 import { inject } from 'vitest';
 
-if (inject('dbUri')) {
-  const uri = inject('dbUri') as string;
-  const url = new URL(uri);
+declare module 'vitest' {
+  export interface ProvidedContext {
+    dbUri: string;
+  }
+}
+
+const dbUri = inject('dbUri');
+if (dbUri) {
+  const url = new URL(dbUri);
 
   process.env.DB_HOST = url.hostname;
   process.env.DB_PORT = url.port;
@@ -348,6 +478,7 @@ export function buildEvent(options: EventOptions = {}): APIGatewayProxyEvent {
         cognitoIdentityPoolId: null, principalOrgId: null, sourceIp: '127.0.0.1',
         user: null, userAgent: 'test', userArn: null,
       },
+      authorizer: undefined,
       path: '/',
       protocol: 'HTTP/1.1',
       requestId: 'test-request-id',
@@ -440,6 +571,19 @@ Add the following scripts using the appropriate package manager CLI or by editin
 }
 ```
 
+If the database is **not None**, also add these db scripts:
+
+```json
+{
+  "scripts": {
+    "db:generate": "drizzle-kit generate",
+    "db:migrate":  "drizzle-kit migrate",
+    "db:push":     "drizzle-kit push",
+    "db:studio":   "drizzle-kit studio"
+  }
+}
+```
+
 ## Step 7 — Report completion
 
 After all steps complete, print a clear summary:
@@ -461,11 +605,18 @@ Created:
   tests/unit/
   tests/integration/
   biome.json
+  [if database selected]
+  drizzle.config.ts
+  src/db/index.ts
+  src/db/schema.ts
+  src/db/types.ts
 
 Next steps:
   - Add your first Lambda handler with the lambda-api-developer skill
   - Write tests with the api-tester skill
   - Run `<pkg> test` to verify the test setup
+  [if database selected]
+  - Define your first table in src/db/schema.ts, then run `<pkg> db:generate` + `<pkg> db:migrate`
 ```
 
 Substitute `<pkg>` with the actual package manager command.

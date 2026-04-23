@@ -4,22 +4,26 @@ A toolkit for building AWS API Gateway + Lambda server APIs. Provides end-to-end
 
 ## Installation
 
-### From GitHub (Claude Code)
+### Claude Code
 
-```bash
-claude plugin install https://github.com/hu-shukang/lambda-api-plugin
-```
-
-### From a downloaded .plugin file (Cowork)
-
-Download the latest `.plugin` file from the [Releases](https://github.com/hu-shukang/lambda-api-plugin/releases) page and install it via the Cowork plugin settings.
-
-### From source (local)
+Clone the repository and load it with `--plugin-dir`:
 
 ```bash
 git clone https://github.com/hu-shukang/lambda-api-plugin
-claude plugin install ./lambda-api-plugin
+claude --plugin-dir ./lambda-api-plugin
 ```
+
+To load it permanently across sessions, add it to your Claude Code settings:
+
+```json
+{
+  "pluginDirectories": ["/path/to/lambda-api-plugin"]
+}
+```
+
+### Cowork
+
+Download the latest `.plugin` file from the [Releases](https://github.com/hu-shukang/lambda-api-plugin/releases) page and install it via the Cowork plugin settings.
 
 ## Commands
 

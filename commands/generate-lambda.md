@@ -56,14 +56,38 @@ Proceed after confirmation.
 Before generating, gather context from the existing codebase:
 
 1. Check if `src/utils/schema.util.ts` exists — determines whether to use `SCHEMA.common.*` for common field types
-2. If DB is needed, read `src/db/schema.ts` to identify the relevant table name and its columns
-3. Check `scripts/generate-openapi.ts` to see the existing import pattern so the new import is consistent
+2. Check `scripts/generate-openapi.ts` to see the existing import pattern so the new import is consistent
 
 ```bash
 ls src/utils/schema.util.ts 2>/dev/null && echo "EXISTS" || echo "MISSING"
 ```
 
+3. If DB is needed, check whether `src/db/schema.ts` exists:
+
+```bash
+ls src/db/schema.ts 2>/dev/null && echo "EXISTS" || echo "MISSING"
+```
+
+- **If MISSING**: The DB module has not been initialized. Before generating the handler, create the following files following the templates in `.claude/skills/drizzle-developer/SKILL.md`:
+  - `drizzle.config.ts` — detect dialect from installed packages (`pg` → `postgresql`, `mysql2` → `mysql`)
+  - `src/db/index.ts` — Drizzle singleton (PostgreSQL or MySQL)
+  - `src/db/schema.ts` — add the table for this resource
+  - `src/db/types.ts` — export inferred `Select` / `Insert` types for the new table
+
+- **If EXISTS**: Read `src/db/schema.ts` to find the table for this resource. If the table is missing, add it following the existing dialect and conventions, then update `src/db/types.ts` with the new inferred types.
+
 ## Step 4 — Generate src/functions/<resource>/<action>/schema.ts
+
+Before writing any Zod schema, read the Zod v4 reference:
+
+```
+.claude/skills/lambda-api-developer/references/zod.md
+```
+
+Follow its API patterns strictly — in particular:
+- Use `z.uuid()`, `z.email()`, `z.url()`, `z.iso.datetime()` (top-level, not `z.string().xxx()`)
+- Add `.describe('...')` to every field — required for OpenAPI spec generation
+- Use `z.coerce.number()` for query parameters
 
 Choose the correct template based on the HTTP method.
 
@@ -75,12 +99,12 @@ import z from 'zod';
 import { registry } from '@/utils/openapi.util';
 
 const pathParamsSchema = z.object({
-  <param>: z.string().uuid(),   // adjust type based on the param name
+  <param>: z.uuid(),   // adjust type based on the param name
 });
 
 const responseSchema = z.object({
   // TODO: define response fields based on the DB table columns
-  id: z.string().uuid(),
+  id: z.uuid(),
 });
 
 registry.registerPath({
@@ -116,7 +140,7 @@ const queryParamsSchema = z.object({
 const responseSchema = z.object({
   items: z.array(z.object({
     // TODO: define item fields based on the DB table columns
-    id: z.string().uuid(),
+    id: z.uuid(),
   })),
   total: z.number(),
 });
@@ -151,7 +175,7 @@ const requestBodySchema = z.object({
 });
 
 const responseSchema = z.object({
-  id: z.string().uuid(),
+  id: z.uuid(),
 });
 
 registry.registerPath({
@@ -181,7 +205,7 @@ import z from 'zod';
 import { registry } from '@/utils/openapi.util';
 
 const pathParamsSchema = z.object({
-  id: z.string().uuid(),
+  id: z.uuid(),
 });
 
 const requestBodySchema = z.object({
@@ -189,7 +213,7 @@ const requestBodySchema = z.object({
 });
 
 const responseSchema = z.object({
-  id: z.string().uuid(),
+  id: z.uuid(),
   // TODO: include updated fields in response
 });
 
@@ -224,7 +248,7 @@ import z from 'zod';
 import { registry } from '@/utils/openapi.util';
 
 const pathParamsSchema = z.object({
-  id: z.string().uuid(),
+  id: z.uuid(),
 });
 
 registry.registerPath({
