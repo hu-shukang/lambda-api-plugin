@@ -25,23 +25,21 @@ To load it permanently across sessions, add it to your Claude Code settings:
 
 Download the latest `.plugin` file from the [Releases](https://github.com/hu-shukang/lambda-api-plugin/releases) page and install it via the Cowork plugin settings.
 
-## Commands
+## Agents
 
-### /generate-lambda
+Agents run as subagents and execute multi-step tasks autonomously.
 
-Generates a new Lambda handler interactively. Run as `/generate-lambda [resource] [action]`.
+### generate-lambda
 
-Claude will ask for the HTTP method, path parameters, whether the handler needs DB access, and any other details needed before generating the files. Creates:
+Generates a new Lambda handler interactively. Asks for the resource name, HTTP method, action name, path parameters, and whether the handler needs DB access, then scaffolds all the files in one run. Creates:
 
 - `src/functions/<resource>/<action>/index.ts` — Middy handler with business logic
 - `src/functions/<resource>/<action>/schema.ts` — Zod event schema + OpenAPI route registration
 - Adds the schema import to `scripts/generate-openapi.ts`
 
-**Usage**: `/generate-lambda`, `/generate-lambda user`, `/generate-lambda user get`
+If the Drizzle DB module is not yet set up, it creates `src/db/schema.ts`, `src/db/index.ts`, and `src/db/types.ts` automatically before generating the handler.
 
-## Agents
-
-Agents run as subagents and execute multi-step tasks autonomously.
+**Triggers**: "generate a lambda", "create a handler", "add an endpoint", "new lambda function", "generate user get".
 
 ### setup-project
 
@@ -179,7 +177,7 @@ MIT
 - Added `run-tests` agent — runs Vitest suite with pass/fail summary
 - Added `write-tests` agent — generates unit and integration tests from handler source
 - Added `biome-check` agent — lints and formats code with Biome, applies safe fixes
-- Added `/generate-lambda` command — interactive Lambda handler scaffolding
+- Added `generate-lambda` agent — interactive Lambda handler scaffolding with auto DB setup
 - Added `SubagentStart` / `SubagentStop` hooks for subagent lifecycle logging
 
 ### 0.1.0

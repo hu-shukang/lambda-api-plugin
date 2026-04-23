@@ -1,30 +1,51 @@
 ---
-description: Generate a new Lambda handler with index.ts and schema.ts
-allowed-tools: Read, Write, Edit, Glob, Grep, Bash
-argument-hint: [resource] [action]
+name: generate-lambda
+description: >
+  Use this agent to generate a new AWS Lambda handler with index.ts and schema.ts.
+  Trigger when the user says "generate a lambda", "create a handler", "add an endpoint",
+  "new lambda function", or provides a resource and action like "generate user get".
+
+  <example>
+  Context: User wants to add a new API endpoint to the project.
+  user: "Generate a lambda for user get"
+  assistant: "I'll launch the generate-lambda agent to scaffold the handler."
+  <commentary>
+  Resource and action are provided — agent pre-fills the questions and proceeds.
+  </commentary>
+  </example>
+
+  <example>
+  Context: User wants to create a new POST endpoint.
+  user: "Create a handler for creating orders"
+  assistant: "Launching the generate-lambda agent to generate the order create handler."
+  <commentary>
+  Resource is implied from context — agent asks for confirmation and fills in defaults.
+  </commentary>
+  </example>
+
+model: inherit
+color: magenta
+tools: ["Read", "Write", "Edit", "Glob", "Grep", "Bash"]
 ---
 
 Generate a new AWS Lambda handler following the project's established patterns.
-The user may have provided a resource and/or action as arguments: $ARGUMENTS
 
 ## Step 1 — Collect handler information
 
 Use AskUserQuestion to confirm the details needed to generate the handler.
-Pre-fill answers from $ARGUMENTS where possible (first word = resource, second word = action).
+If the user's request already contains a resource and/or action, pre-fill those answers.
 Ask all questions in a single call.
 
 Questions to ask:
 
 1. **Resource name** — the entity this handler operates on (e.g. `user`, `order`, `post`)
-   - Pre-fill from first word of $ARGUMENTS if available
    - Options: free text
 
 2. **HTTP method** — the method this handler handles
    - Options: GET (single), GET (list), POST, PUT, DELETE
 
 3. **Action name** — the sub-directory name under the resource (e.g. `get`, `list`, `create`, `update`, `delete`)
-   - Pre-fill from second word of $ARGUMENTS if available, or suggest based on method:
-     GET (single) → get, GET (list) → list, POST → create, PUT → update, DELETE → delete
+   - Suggest based on method if not provided: GET (single) → get, GET (list) → list, POST → create, PUT → update, DELETE → delete
    - Options: free text
 
 4. **Does this handler use the database?**
@@ -99,12 +120,12 @@ import z from 'zod';
 import { registry } from '@/utils/openapi.util';
 
 const pathParamsSchema = z.object({
-  <param>: z.uuid(),   // adjust type based on the param name
+  <param>: z.uuid().describe('<param> of the <resource>'),
 });
 
 const responseSchema = z.object({
   // TODO: define response fields based on the DB table columns
-  id: z.uuid(),
+  id: z.uuid().describe('Unique identifier'),
 });
 
 registry.registerPath({
@@ -133,16 +154,16 @@ import z from 'zod';
 import { registry } from '@/utils/openapi.util';
 
 const queryParamsSchema = z.object({
-  offset: z.coerce.number().int().min(0).default(0),
-  limit:  z.coerce.number().int().min(1).max(100).default(20),
+  offset: z.coerce.number().int().min(0).default(0).describe('Number of records to skip'),
+  limit:  z.coerce.number().int().min(1).max(100).default(20).describe('Number of records to return'),
 });
 
 const responseSchema = z.object({
   items: z.array(z.object({
     // TODO: define item fields based on the DB table columns
-    id: z.uuid(),
+    id: z.uuid().describe('Unique identifier'),
   })),
-  total: z.number(),
+  total: z.number().describe('Total number of records'),
 });
 
 registry.registerPath({
@@ -175,7 +196,7 @@ const requestBodySchema = z.object({
 });
 
 const responseSchema = z.object({
-  id: z.uuid(),
+  id: z.uuid().describe('ID of the created <resource>'),
 });
 
 registry.registerPath({
@@ -205,7 +226,7 @@ import z from 'zod';
 import { registry } from '@/utils/openapi.util';
 
 const pathParamsSchema = z.object({
-  id: z.uuid(),
+  id: z.uuid().describe('ID of the <resource> to update'),
 });
 
 const requestBodySchema = z.object({
@@ -213,7 +234,7 @@ const requestBodySchema = z.object({
 });
 
 const responseSchema = z.object({
-  id: z.uuid(),
+  id: z.uuid().describe('Unique identifier'),
   // TODO: include updated fields in response
 });
 
@@ -248,7 +269,7 @@ import z from 'zod';
 import { registry } from '@/utils/openapi.util';
 
 const pathParamsSchema = z.object({
-  id: z.uuid(),
+  id: z.uuid().describe('ID of the <resource> to delete'),
 });
 
 registry.registerPath({
@@ -269,12 +290,10 @@ export const schema = APIGatewayProxyEventSchema.extend({
 });
 ```
 
-Replace all `<resource>`, `<Resource>`, `<param>` placeholders with the actual values collected in Step 1.
-Fill in `TODO` fields using the DB table columns found in Step 3 where possible; leave them as `TODO` comments if the table is unknown.
+Replace all `<resource>`, `<Resource>`, `<param>` placeholders with the actual values.
+Fill in `TODO` fields using the DB table columns found in Step 3 where possible.
 
 ## Step 5 — Generate src/functions/<resource>/<action>/index.ts
-
-Choose the correct template based on the HTTP method and whether the handler uses the DB.
 
 ### With DB (Drizzle)
 
@@ -284,7 +303,7 @@ import { parser } from '@aws-lambda-powertools/parser/middleware';
 import middy from '@middy/core';
 import httpErrorHandler from '@middy/http-error-handler';
 import createError from 'http-errors';
-import { eq } from 'drizzle-orm';            // only for methods that filter by a field
+import { eq } from 'drizzle-orm';
 
 import { db } from '@/db';
 import { <table> } from '@/db/schema';
@@ -305,19 +324,19 @@ export const handler = middy()
 
 Fill in the handler body based on the method:
 
-- **GET (single)**: `db.select().from(<table>).where(eq(<table>.id, id)).then(r => r[0])` → 404 if undefined
-- **GET (list)**: `db.select().from(<table>).orderBy(asc(<table>.createdAt)).limit(limit).offset(offset)` → `{ items, total: items.length }`
-- **POST**: `db.insert(<table>).values({...event.body}).returning()` → `{ statusCode: 201, body: { id: created.id } }`
-- **PUT**: `db.update(<table>).set({...event.body}).where(eq(<table>.id, id)).returning()` → 404 if `[]`
-- **DELETE**: `db.delete(<table>).where(eq(<table>.id, id)).returning()` → 404 if `[]`, else `{ statusCode: 204 }`
+- **GET (single)**: query with `eq`, throw `createError.NotFound()` if result is undefined
+- **GET (list)**: query with `orderBy` + `limit` + `offset`, return `{ items, total: items.length }`
+- **POST**: `db.insert().values().returning()`, return `{ statusCode: 201, body: { id } }`
+- **PUT**: `db.update().set().where().returning()`, throw `createError.NotFound()` if returning is empty
+- **DELETE**: `db.delete().where().returning()`, throw `createError.NotFound()` if returning is empty, return `{ statusCode: 204 }`
 
 ### Without DB
 
-Same middleware chain, omit the `db` and `drizzle-orm` imports, implement business logic with a `TODO` comment.
+Same middleware chain, omit `db` and `drizzle-orm` imports. Implement business logic with a `TODO` comment.
 
 ## Step 6 — Register the route in scripts/generate-openapi.ts
 
-Add an import line for the new schema file. Read the existing file and add the import after the last existing schema import, maintaining alphabetical order within the resource group:
+Add an import line for the new schema file after the last existing schema import, maintaining alphabetical order within the resource group:
 
 ```typescript
 import '@/functions/<resource>/<action>/schema';
